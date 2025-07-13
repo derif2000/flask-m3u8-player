@@ -1,0 +1,34 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mi Reproductor HLS</title>
+</head>
+<body>
+<h2>Reproductor HLS</h2>
+<video id="video" controls autoplay style="width: 80%; max-width: 800px;"></video>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+  const video = document.getElementById('video');
+  const m3u8Url = 'https://x8oi6owwkjoewr.premilkyway.com/hls2/01/10982/7eaxv02zgl1q_,l,n,.urlset/index-f1-v1-a1.m3u8?t=HKyL0w2NO00P-LweJIhpj7pZEhEtIW8ufHjZ2mARmzY&s=1752436347&e=129600&f=54914214&srv=Gy4KXLg7mXRDXE7k&i=0.4&sp=500&p1=Gy4KXLg7mXRDXE7k&p2=Gy4KXLg7mXRDXE7k&asn=10620';
+
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(m3u8Url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+      video.play();
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = m3u8Url;
+    video.addEventListener('loadedmetadata', function () {
+      video.play();
+    });
+  } else {
+    alert("Tu navegador no soporta HLS.");
+  }
+</script>
+</body>
+</html>

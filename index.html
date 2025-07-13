@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mi Reproductor HLS</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+<h1>Mi Reproductor HLS</h1>
+
+<input type="text" id="video-url" placeholder="Pega aquí la URL del reproductor original">
+<button onclick="loadVideo()">Cargar</button>
+
+<br><br>
+
+<video id="video" controls autoplay width="640" height="360"></video>
+
+<script>
+async function loadVideo() {
+    const inputUrl = document.getElementById("video-url").value.trim();
+    const video = document.getElementById("video");
+    video.pause();
+    video.src = ""; // reset
+    video.load();
+
+    if (!inputUrl) {
+        alert("Por favor pega la URL del reproductor original");
+        return;
+    }
+
+    try {
+        console.log("Llamando al backend…");
+        const res = await fetch(`http://127.0.0.1:5000/api/get-m3u8?url=${encodeURIComponent(inputUrl)}`);
+        const data = await res.json();
+
+        if (data.m3u8) {
+            console.log("Recibido .m3u8:", data.m3u8);
+
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(data.m3u8);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    video.play();
+                });
+            } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+                video.src = data.m3u8;
+                video.addEventListener("loadedmetadata", () => {
+                    video.play();
+                });
+            } else {
+                alert("Tu navegador no soporta HLS");
+            }
+        } else {
+            alert("No se encontró .m3u8: " + JSON.stringify(data));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error al llamar al backend");
+    }
+}
+</script>
+
+</body>
+</html>
