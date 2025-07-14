@@ -2,10 +2,12 @@ from flask import Flask, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from flask_cors import CORS  # ✅ Importar CORS
 import time
 import json
 
 app = Flask(__name__)
+CORS(app)  # ✅ Habilitar CORS para todos los orígenes
 
 def get_driver():
     options = webdriver.ChromeOptions()
