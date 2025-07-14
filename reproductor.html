@@ -1,34 +1,71 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Mi Reproductor HLS</title>
+<title>Mi reproductor HLS</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
-<h2>Reproductor HLS</h2>
-<video id="video" controls autoplay style="width: 80%; max-width: 800px;"></video>
+<h1>Mi reproductor HLS</h1>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<input type="text" id="videoUrl" placeholder="URL del video" style="width: 80%;">
+<button id="playBtn">Reproducir</button>
+
+<video id="video" controls width="640" height="360"></video>
+
 <script>
-  const video = document.getElementById('video');
-  const m3u8Url = 'https://x8oi6owwkjoewr.premilkyway.com/hls2/01/10982/7eaxv02zgl1q_,l,n,.urlset/index-f1-v1-a1.m3u8?t=HKyL0w2NO00P-LweJIhpj7pZEhEtIW8ufHjZ2mARmzY&s=1752436347&e=129600&f=54914214&srv=Gy4KXLg7mXRDXE7k&i=0.4&sp=500&p1=Gy4KXLg7mXRDXE7k&p2=Gy4KXLg7mXRDXE7k&asn=10620';
+window.addEventListener("DOMContentLoaded", () => {
+    const playBtn = document.getElementById("playBtn");
+    const videoInput = document.getElementById("videoUrl");
+    const video = document.getElementById("video");
+    const apiUrl = "http://[2a00:1838:37:4db:ab74]:8000/get_m3u8"; // tu IP y puerto
 
-  if (Hls.isSupported()) {
-    const hls = new Hls();
-    hls.loadSource(m3u8Url);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, function () {
-      video.play();
+    playBtn.addEventListener("click", async () => {
+        const url = videoInput.value.trim();
+
+        if (!url) {
+            alert("Por favor ingresa una URL");
+            return;
+        }
+
+        video.src = "";
+        video.load();
+
+        try {
+            const resp = await fetch(apiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url })
+            });
+
+            const data = await resp.json();
+
+            if (data.m3u8) {
+                if (Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(data.m3u8);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play();
+                    });
+                } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+                    video.src = data.m3u8;
+                    video.addEventListener("loadedmetadata", () => {
+                        video.play();
+                    });
+                } else {
+                    alert("Tu navegador no soporta HLS");
+                }
+            } else {
+                alert("No se encontró un enlace .m3u8");
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert("Error al llamar la API o al procesar la respuesta");
+        }
     });
-  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = m3u8Url;
-    video.addEventListener('loadedmetadata', function () {
-      video.play();
-    });
-  } else {
-    alert("Tu navegador no soporta HLS.");
-  }
+});
 </script>
 </body>
 </html>

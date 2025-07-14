@@ -68,7 +68,7 @@ def get_best_m3u8(url, timeout=20):
 
 
 if __name__ == "__main__":
-    test_url = "https://hgplaycdn.com/e/7eaxv02zgl1q"
+    test_url = "https://hailindihg.com/e/hwruy2r5fvkj"
     m3u8_url = get_best_m3u8(test_url, timeout=20)
     if m3u8_url:
         print(m3u8_url)
