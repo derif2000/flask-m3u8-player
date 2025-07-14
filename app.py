@@ -1,9 +1,11 @@
+from flask import Flask, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import json
 
+app = Flask(__name__)
 
 def get_driver():
     options = webdriver.ChromeOptions()
@@ -52,7 +54,6 @@ def get_best_m3u8(url, timeout=20):
                         if ".m3u8" in req_url and "blob:" not in req_url:
                             if req_url not in found:
                                 found.add(req_url)
-                                print(f"🔷 Encontrado: {req_url}")
                                 best_url = req_url
             except Exception:
                 continue
@@ -63,17 +64,24 @@ def get_best_m3u8(url, timeout=20):
         time.sleep(1)
 
     driver.quit()
-
-    if best_url:
-        print(f"✅ Mejor .m3u8: {best_url}")
-    else:
-        print("⚠️ No se encontró ninguna URL .m3u8")
-
     return best_url
 
 
-if __name__ == "__main__":
-    test_url = "https://hgplaycdn.com/e/7eaxv02zgl1q"
-    m3u8_url = get_best_m3u8(test_url, timeout=20)
+@app.route("/get_m3u8", methods=["POST"])
+def api_get_m3u8():
+    data = request.json
+    url = data.get("url")
+
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    m3u8_url = get_best_m3u8(url, timeout=20)
+
     if m3u8_url:
-        print(m3u8_url)
+        return jsonify({"m3u8": m3u8_url})
+    else:
+        return jsonify({"error": "No m3u8 found"}), 404
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=False)
