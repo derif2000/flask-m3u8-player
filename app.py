@@ -2,12 +2,12 @@ from flask import Flask, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from flask_cors import CORS  # ✅ Importar CORS
+from flask_cors import CORS
 import time
 import json
 
 app = Flask(__name__)
-CORS(app)  # ✅ Habilitar CORS para todos los orígenes
+CORS(app)  # habilita CORS para todos los orígenes
 
 def get_driver():
     options = webdriver.ChromeOptions()
@@ -69,8 +69,12 @@ def get_best_m3u8(url, timeout=20):
     return best_url
 
 
-@app.route("/get_m3u8", methods=["POST"])
+@app.route("/get_m3u8", methods=["POST", "OPTIONS"])
 def api_get_m3u8():
+    if request.method == "OPTIONS":
+        # Responder preflight de CORS
+        return jsonify({}), 200
+
     data = request.json
     url = data.get("url")
 
