@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import traceback
+import threading  # Importación faltante añadida
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 
@@ -234,8 +235,12 @@ def stats():
 
 def cleanup():
     if SeleniumManager._instance:
-        SeleniumManager._instance.quit()
-        SeleniumManager._instance = None
+        try:
+            SeleniumManager._instance.quit()
+        except Exception as e:
+            logger.error(f"Error al limpiar Selenium: {str(e)}")
+        finally:
+            SeleniumManager._instance = None
 
 import atexit
 atexit.register(cleanup)
