@@ -1,7 +1,9 @@
+const express = require('express');
 const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
 const https = require('https');
+
+const app = express();
+app.use(express.static('public'));
 
 function downloadText(url) {
   return new Promise((resolve, reject) => {
@@ -13,64 +15,89 @@ function downloadText(url) {
   });
 }
 
-(async () => {
-  const browser = await puppeteer.launch({ 
-    headless: false,
+async function scrapeM3u8(pageUrl) {
+  const browser = await puppeteer.launch({
+    headless: true,
     args: ['--disable-web-security']
   });
   const page = await browser.newPage();
 
+  let finalM3u8Url = null;
+
   try {
-    await page.goto('https://hgbazooka.com/e/7ko6052x81jn', { 
-      waitUntil: 'networkidle2',
-      timeout: 60000
-    });
-
-    console.log("🌐 Página cargada:", page.url());
-
+    await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
     await page.waitForFunction(() => typeof jwplayer === 'function', { timeout: 15000 });
-
-    console.log("🎥 JWPlayer detectado");
 
     const relativeMaster = await page.evaluate(() => {
       const player = jwplayer('vplayer');
       if (player && player.getPlaylistItem) {
         const item = player.getPlaylistItem();
-        if (item && item.file) {
-          return item.file; // ruta relativa
-        }
+        if (item && item.file) return item.file;
       }
       return null;
     });
 
-    if (!relativeMaster) throw new Error("No se encontró master.m3u8 en JWPlayer");
+    if (!relativeMaster) throw new Error("No file found from jwplayer");
 
-    const base = new URL(page.url());
-    const masterUrl = `${base.origin}${relativeMaster}`;
-    console.log("🎬 Master M3U8 URL:", masterUrl);
+    let masterUrl;
 
-    // descargar el master.m3u8
-    console.log("⬇️ Descargando master.m3u8…");
+    // ✅ Si ya es absoluta, úsala tal cual
+    if (/^https?:\/\//i.test(relativeMaster)) {
+      masterUrl = relativeMaster;
+    } else {
+      const base = new URL(page.url());
+      masterUrl = `${base.origin}${relativeMaster}`;
+    }
+
+    console.log(`🎬 Master M3U8 URL: ${masterUrl}`);
+
     const masterContent = await downloadText(masterUrl);
 
-    // buscar la primera línea que sea otra m3u8
-    const lines = masterContent.split('\n');
-    const variant = lines.find(line => line.trim().endsWith('.m3u8'));
+    if (masterContent.includes('#EXTM3U')) {
+      const variant = masterContent
+        .split('\n')
+        .find(line => line.trim().endsWith('.m3u8'));
 
-    if (!variant) throw new Error("No se encontró ninguna variante en master.m3u8");
-
-    const finalM3u8Url = new URL(variant, masterUrl).href;
-    console.log("✅ Variante encontrada:", finalM3u8Url);
-
-    const txtPath = path.join(__dirname, 'm3u8_final.txt');
-    fs.writeFileSync(txtPath, finalM3u8Url);
-    console.log("✅ URL final guardada en:", txtPath);
+      if (variant) {
+        finalM3u8Url = new URL(variant, masterUrl).href;
+      } else {
+        finalM3u8Url = masterUrl;
+      }
+    } else {
+      throw new Error("Downloaded file is not a valid m3u8 playlist");
+    }
 
   } catch (error) {
     console.error("❌ Error:", error.message);
-    await page.screenshot({ path: 'error.png' });
-    console.log("📸 Captura guardada en error.png");
   } finally {
     await browser.close();
   }
-})();
+
+  return finalM3u8Url;
+}
+
+app.get('/get-m3u8', async (req, res) => {
+  const pageUrl = req.query.url;
+  if (!pageUrl) return res.status(400).json({ error: 'No URL provided' });
+
+  const m3u8 = await scrapeM3u8(pageUrl);
+  if (!m3u8) return res.status(500).json({ error: 'Failed to scrape m3u8' });
+
+  res.json({ m3u8 });
+});
+
+app.get('/proxy-m3u8', (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).send('No URL provided');
+
+  https.get(url, (proxiedRes) => {
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    proxiedRes.pipe(res);
+  }).on('error', (err) => {
+    res.status(500).send('Error fetching m3u8');
+  });
+});
+
+app.listen(4500, '0.0.0.0', () => {
+  console.log('✅ Servidor corriendo en http://0.0.0.0:4500');
+});
