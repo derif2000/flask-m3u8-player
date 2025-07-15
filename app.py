@@ -7,7 +7,7 @@ import time
 import json
 
 app = Flask(__name__)
-CORS(app)  # 🚨 aquí habilitamos CORS para todas las rutas y orígenes
+CORS(app, resources={r"/*": {"origins": "*"}})  # 🔷 explícito para todas las rutas
 
 def get_driver():
     options = webdriver.ChromeOptions()
@@ -57,7 +57,8 @@ def get_best_m3u8(url, timeout=40):
                                 print(f"🔷 Encontrado: {req_url}")
                                 driver.quit()
                                 return req_url
-            except Exception:
+            except Exception as e:
+                print(f"Error procesando log: {e}")
                 continue
 
         time.sleep(1)
@@ -68,18 +69,22 @@ def get_best_m3u8(url, timeout=40):
 
 @app.route("/get_m3u8", methods=["POST"])
 def api_get_m3u8():
-    data = request.json
-    url = data.get("url")
+    try:
+        data = request.json
+        url = data.get("url")
 
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
+        if not url:
+            return jsonify({"error": "No URL provided"}), 400
 
-    m3u8_url = get_best_m3u8(url, timeout=40)
+        m3u8_url = get_best_m3u8(url, timeout=40)
 
-    if m3u8_url:
-        return jsonify({"m3u8": m3u8_url})
-    else:
-        return jsonify({"error": "No m3u8 found"}), 404
+        if m3u8_url:
+            return jsonify({"m3u8": m3u8_url})
+        else:
+            return jsonify({"error": "No m3u8 found"}), 404
+    except Exception as e:
+        print(f"❌ Error en /get_m3u8: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)
