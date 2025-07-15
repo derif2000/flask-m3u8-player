@@ -1,7 +1,6 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const https = require('https');
-const path = require('path');
 
 const app = express();
 app.use(express.static('public'));
@@ -19,31 +18,43 @@ function downloadText(url) {
 async function scrapeM3u8(pageUrl) {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--disable-web-security']
+    args: ['--disable-web-security', '--no-sandbox', '--disable-setuid-sandbox']
   });
   const page = await browser.newPage();
 
   let finalM3u8Url = null;
 
   try {
+    console.log(`🌐 Abriendo ${pageUrl}`);
     await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-    await page.waitForFunction(() => typeof jwplayer === 'function', { timeout: 15000 });
 
-    const relativeMaster = await page.evaluate(() => {
-      const player = jwplayer('vplayer');
-      if (player && player.getPlaylistItem) {
-        const item = player.getPlaylistItem();
-        if (item && item.file) return item.file;
-      }
-      return null;
+    const iframeSrc = await page.evaluate(() => {
+      const iframe = document.querySelector('#iframe-holder iframe');
+      return iframe?.src || null;
     });
 
-    const base = new URL(page.url());
-    const masterUrl = `${base.origin}${relativeMaster}`;
-    const masterContent = await downloadText(masterUrl);
-    const variant = masterContent.split('\n').find(line => line.trim().endsWith('.m3u8'));
+    if (!iframeSrc) throw new Error('No se encontró el iframe');
 
-    finalM3u8Url = new URL(variant, masterUrl).href;
+    console.log(`🔗 Iframe src: ${iframeSrc}`);
+    await page.goto(iframeSrc, { waitUntil: 'networkidle2', timeout: 60000 });
+
+    // escuchar las requests en la página del iframe
+    const m3u8Urls = new Set();
+    page.on('request', request => {
+      const url = request.url();
+      if (url.includes('.m3u8') && !url.startsWith('blob:')) {
+        console.log(`🎯 Capturada URL .m3u8: ${url}`);
+        m3u8Urls.add(url);
+      }
+    });
+
+    // esperar unos segundos para que cargue y se capturen las requests
+    await page.waitForTimeout(5000);
+
+    if (m3u8Urls.size === 0) throw new Error('No se capturaron URLs .m3u8');
+
+    // elegir la que contiene master.m3u8 si existe
+    finalM3u8Url = [...m3u8Urls].find(u => u.includes('master.m3u8')) || [...m3u8Urls][0];
 
   } catch (error) {
     console.error("❌ Error:", error.message);
