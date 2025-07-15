@@ -1,63 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Reproductor M3U8</title>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <title>Probador M3U8</title>
 </head>
 <body>
-    <input type="text" id="videoUrl" placeholder="Ingresa URL del video">
-    <button id="loadBtn">Cargar Video</button>
-    <div>
-        <video id="video" controls width="640" height="360"></video>
-    </div>
+    <h1>Probador de Endpoint M3U8</h1>
+    <input type="text" id="videoUrl" placeholder="Ingresa URL del video" style="width: 400px;">
+    <button onclick="testEndpoint()">Probar</button>
+    <div id="result" style="margin-top: 20px; white-space: pre-wrap;"></div>
 
     <script>
-        document.getElementById('loadBtn').addEventListener('click', async function() {
-            const videoUrl = document.getElementById('videoUrl').value;
-            const video = document.getElementById('video');
+        function testEndpoint() {
+            const url = document.getElementById('videoUrl').value;
+            const resultDiv = document.getElementById('result');
             
-            try {
-                // Mostrar feedback al usuario
-                this.textContent = 'Cargando...';
-                this.disabled = true;
-                
-                // Hacer la solicitud con headers adecuados
-                const response = await fetch('http://35.239.208.148:5000/get_m3u8', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ url: videoUrl })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                if (Hls.isSupported()) {
-                    const hls = new Hls();
-                    hls.loadSource(data.m3u8);
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                        video.play();
-                    });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = data.m3u8;
-                    video.addEventListener('loadedmetadata', function() {
-                        video.play();
-                    });
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert(`Error al cargar el video: ${error.message}`);
-            } finally {
-                this.textContent = 'Cargar Video';
-                this.disabled = false;
+            if (!url) {
+                resultDiv.textContent = 'Por favor ingresa una URL';
+                return;
             }
-        });
+
+            resultDiv.textContent = 'Consultando...';
+            
+            // Usando GET
+            fetch(`http://35.239.208.148:5000/get_m3u8?url=${encodeURIComponent(url)}`)
+                .then(response => response.json())
+                .then(data => {
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(error => {
+                    resultDiv.textContent = 'Error: ' + error.message;
+                });
+        }
     </script>
 </body>
 </html>
