@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -6,6 +7,7 @@ import time
 import json
 
 app = Flask(__name__)
+CORS(app)  # 🚨 aquí habilitamos CORS para todas las rutas y orígenes
 
 def get_driver():
     options = webdriver.ChromeOptions()
@@ -31,7 +33,7 @@ def get_driver():
     )
     return driver
 
-def get_best_m3u8(url, timeout=40):  # aumentado a 40s
+def get_best_m3u8(url, timeout=40):
     driver = get_driver()
     driver.get(url)
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
