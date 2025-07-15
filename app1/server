@@ -1,0 +1,19 @@
+const express = require('express');
+const scrapeM3u8 = require('./scraper');
+const app = express();
+
+app.use(express.static('public'));
+
+app.get('/get-m3u8', async (req, res) => {
+  const pageUrl = req.query.url;
+  if (!pageUrl) return res.status(400).json({ error: 'No URL provided' });
+
+  const m3u8 = await scrapeM3u8(pageUrl);
+  if (!m3u8) return res.status(500).json({ error: 'Failed to scrape m3u8' });
+
+  res.json({ m3u8 });
+});
+
+app.listen(3000, () => {
+  console.log('✅ Servidor en http://localhost:3000');
+});

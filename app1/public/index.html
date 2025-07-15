@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reproductor HLS</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+<h2>Mi reproductor HLS</h2>
+
+<video id="video" controls width="640" height="360"></video>
+
+<script>
+const pageUrl = "https://hgbazooka.com/e/7ko6052x81jn";
+
+async function playStream() {
+  try {
+    const res = await fetch('/get-m3u8?url=' + encodeURIComponent(pageUrl));
+    const data = await res.json();
+    if (!data.m3u8) {
+      alert("Error: " + (data.error || "No se pudo obtener m3u8"));
+      return;
+    }
+
+    const video = document.getElementById('video');
+    const m3u8Url = '/proxy-m3u8?url=' + encodeURIComponent(data.m3u8);
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(m3u8Url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play();
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = m3u8Url;
+      video.addEventListener('loadedmetadata', () => {
+        video.play();
+      });
+    } else {
+      alert('Tu navegador no soporta HLS');
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error: " + err.message);
+  }
+}
+
+playStream();
+</script>
+</body>
+</html>

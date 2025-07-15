@@ -1,0 +1,15 @@
+{
+  "name": "player-m3u8-server",
+  "version": "1.0.0",
+  "description": "Servidor Node para resolver y proxificar m3u8 desde JWPlayer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "elrefugiodelpirata.com",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "puppeteer": "^22.7.1"
+  }
+}
