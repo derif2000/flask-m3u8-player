@@ -1,21 +1,20 @@
 from flask import Flask, request, jsonify
 from selenium import webdriver
-from flask_cors import CORS
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from flask_cors import CORS
 import time
 import json
 
 app = Flask(__name__)
+CORS(app)  # habilita CORS
 
 def get_driver():
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-software-rasterizer")
-    options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--start-maximized")
     options.add_argument("--autoplay-policy=no-user-gesture-required")
     options.add_argument("--disable-infobars")
     options.add_argument("--disable-extensions")
@@ -55,6 +54,7 @@ def get_best_m3u8(url, timeout=20):
                         if ".m3u8" in req_url and "blob:" not in req_url:
                             if req_url not in found:
                                 found.add(req_url)
+                                print(f"🔷 Encontrado: {req_url}")
                                 best_url = req_url
             except Exception:
                 continue
@@ -68,8 +68,12 @@ def get_best_m3u8(url, timeout=20):
     return best_url
 
 
-@app.route("/get_m3u8", methods=["POST"])
+@app.route("/get_m3u8", methods=["POST", "OPTIONS"])
 def api_get_m3u8():
+    if request.method == "OPTIONS":
+        # Responder preflight
+        return jsonify({}), 200
+
     data = request.json
     url = data.get("url")
 
