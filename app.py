@@ -2,19 +2,19 @@ from flask import Flask, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from flask_cors import CORS
 import time
 import json
 
 app = Flask(__name__)
-CORS(app)  # habilita CORS
 
 def get_driver():
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--start-maximized")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--remote-debugging-port=9222")
     options.add_argument("--autoplay-policy=no-user-gesture-required")
     options.add_argument("--disable-infobars")
     options.add_argument("--disable-extensions")
@@ -31,15 +31,13 @@ def get_driver():
     )
     return driver
 
-
-def get_best_m3u8(url, timeout=20):
+def get_best_m3u8(url, timeout=40):  # aumentado a 40s
     driver = get_driver()
     driver.get(url)
     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
     found = set()
     start_time = time.time()
-    best_url = None
 
     while time.time() - start_time < timeout:
         logs = driver.get_log("performance")
@@ -55,38 +53,31 @@ def get_best_m3u8(url, timeout=20):
                             if req_url not in found:
                                 found.add(req_url)
                                 print(f"🔷 Encontrado: {req_url}")
-                                best_url = req_url
+                                driver.quit()
+                                return req_url
             except Exception:
                 continue
-
-        if best_url:
-            break
 
         time.sleep(1)
 
     driver.quit()
-    return best_url
+    print("⚠️ No se encontró ninguna URL .m3u8")
+    return None
 
-
-@app.route("/get_m3u8", methods=["POST", "OPTIONS"])
+@app.route("/get_m3u8", methods=["POST"])
 def api_get_m3u8():
-    if request.method == "OPTIONS":
-        # Responder preflight
-        return jsonify({}), 200
-
     data = request.json
     url = data.get("url")
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    m3u8_url = get_best_m3u8(url, timeout=20)
+    m3u8_url = get_best_m3u8(url, timeout=40)
 
     if m3u8_url:
         return jsonify({"m3u8": m3u8_url})
     else:
         return jsonify({"error": "No m3u8 found"}), 404
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
