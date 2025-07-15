@@ -1,36 +1,205 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Probador M3U8</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reproductor M3U8 en Tiempo Real</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-group {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #videoUrl {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+            font-size: 16px;
+        }
+        #loadBtn {
+            padding: 12px 20px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        #loadBtn:hover {
+            background: #3367d6;
+        }
+        #loadBtn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 4px;
+            display: none;
+        }
+        .error {
+            background: #ffebee;
+            color: #d32f2f;
+            display: block;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #388e3c;
+            display: block;
+        }
+        #videoPlayer {
+            width: 100%;
+            background: #000;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <h1>Probador de Endpoint M3U8</h1>
-    <input type="text" id="videoUrl" placeholder="Ingresa URL del video" style="width: 400px;">
-    <button onclick="testEndpoint()">Probar</button>
-    <div id="result" style="margin-top: 20px; white-space: pre-wrap;"></div>
+    <div class="container">
+        <h1>Reproductor M3U8 en Tiempo Real</h1>
+        
+        <div class="input-group">
+            <input type="text" id="videoUrl" placeholder="Pega aquí la URL del video (ej: https://ejemplo.com/video)">
+            <button id="loadBtn">Cargar</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <video id="videoPlayer" controls></video>
+    </div>
 
     <script>
-        function testEndpoint() {
-            const url = document.getElementById('videoUrl').value;
-            const resultDiv = document.getElementById('result');
+        document.addEventListener('DOMContentLoaded', function() {
+            const videoUrlInput = document.getElementById('videoUrl');
+            const loadBtn = document.getElementById('loadBtn');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const statusDiv = document.getElementById('status');
             
-            if (!url) {
-                resultDiv.textContent = 'Por favor ingresa una URL';
-                return;
+            // Configurar HLS.js
+            let hls = null;
+            
+            loadBtn.addEventListener('click', async function() {
+                const url = videoUrlInput.value.trim();
+                
+                if (!url) {
+                    showStatus('Por favor ingresa una URL válida', 'error');
+                    return;
+                }
+                
+                loadBtn.disabled = true;
+                loadBtn.innerHTML = '<span class="loading"></span> Procesando...';
+                statusDiv.textContent = '';
+                statusDiv.className = 'status';
+                
+                try {
+                    showStatus('Extrayendo enlace de video...', '');
+                    
+                    // Llamar al backend para extraer M3U8
+                    const response = await fetch('http://tu-backend.com/extract', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url: url })
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Error al procesar la URL');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (!data.success || !data.stream_url) {
+                        throw new Error('No se pudo obtener el enlace de video');
+                    }
+                    
+                    showStatus('Reproduciendo video...', 'success');
+                    playStream(data.stream_url);
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    showStatus(`Error: ${error.message}`, 'error');
+                    
+                    // Detener reproducción anterior
+                    if (hls) {
+                        hls.destroy();
+                    }
+                    videoPlayer.src = '';
+                } finally {
+                    loadBtn.disabled = false;
+                    loadBtn.textContent = 'Cargar';
+                }
+            });
+            
+            function playStream(m3u8Url) {
+                if (Hls.isSupported()) {
+                    // Destruir instancia anterior si existe
+                    if (hls) {
+                        hls.destroy();
+                    }
+                    
+                    hls = new Hls();
+                    hls.loadSource(m3u8Url);
+                    hls.attachMedia(videoPlayer);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                        videoPlayer.play();
+                    });
+                } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Soporte nativo para Safari
+                    videoPlayer.src = m3u8Url;
+                    videoPlayer.addEventListener('loadedmetadata', function() {
+                        videoPlayer.play();
+                    });
+                } else {
+                    throw new Error('Tu navegador no soporta reproducción de streams HLS');
+                }
             }
-
-            resultDiv.textContent = 'Consultando...';
             
-            // Usando GET
-            fetch(`http://35.239.208.148:5000/get_m3u8?url=${encodeURIComponent(url)}`)
-                .then(response => response.json())
-                .then(data => {
-                    resultDiv.textContent = JSON.stringify(data, null, 2);
-                })
-                .catch(error => {
-                    resultDiv.textContent = 'Error: ' + error.message;
-                });
-        }
+            function showStatus(message, type) {
+                statusDiv.textContent = message;
+                if (type) {
+                    statusDiv.className = `status ${type}`;
+                } else {
+                    statusDiv.className = 'status';
+                    statusDiv.style.display = 'none';
+                }
+            }
+        });
     </script>
 </body>
 </html>

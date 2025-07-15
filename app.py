@@ -4,11 +4,26 @@ import yt_dlp
 import logging
 
 app = Flask(__name__)
-CORS(app)  # Habilitar CORS para todos los dominios
+# Configuración detallada de CORS
+CORS(app, resources={
+    r"/extract": {
+        "origins": "*",
+        "methods": ["POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+@app.after_request
+def after_request(response):
+    # Headers adicionales para CORS
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    return response
 
 def get_m3u8_url(target_url):
     ydl_opts = {
@@ -40,8 +55,12 @@ def get_m3u8_url(target_url):
         logger.error(f"Error al extraer M3U8: {str(e)}")
         return None
 
-@app.route('/extract', methods=['POST'])
+@app.route('/extract', methods=['POST', 'OPTIONS'])
 def extract_m3u8():
+    if request.method == 'OPTIONS':
+        # Preflight request. Respond successfully.
+        return jsonify({}), 200
+    
     data = request.get_json()
     if not data or 'url' not in data:
         return jsonify({"error": "URL parameter is required"}), 400
