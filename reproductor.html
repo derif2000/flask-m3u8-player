@@ -1,71 +1,63 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Mi reproductor HLS</title>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <title>Reproductor M3U8</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
-<h1>Mi reproductor HLS</h1>
+    <input type="text" id="videoUrl" placeholder="Ingresa URL del video">
+    <button id="loadBtn">Cargar Video</button>
+    <div>
+        <video id="video" controls width="640" height="360"></video>
+    </div>
 
-<input type="text" id="videoUrl" placeholder="URL del video" style="width: 80%;">
-<button id="playBtn">Reproducir</button>
-
-<video id="video" controls width="640" height="360"></video>
-
-<script>
-window.addEventListener("DOMContentLoaded", () => {
-    const playBtn = document.getElementById("playBtn");
-    const videoInput = document.getElementById("videoUrl");
-    const video = document.getElementById("video");
-    const apiUrl = "http://35.239.208.148:5000/get_m3u8"; // tu IP y puerto
-
-    playBtn.addEventListener("click", async () => {
-        const url = videoInput.value.trim();
-
-        if (!url) {
-            alert("Por favor ingresa una URL");
-            return;
-        }
-
-        video.src = "";
-        video.load();
-
-        try {
-            const resp = await fetch(apiUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url })
-            });
-
-            const data = await resp.json();
-
-            if (data.m3u8) {
+    <script>
+        document.getElementById('loadBtn').addEventListener('click', async function() {
+            const videoUrl = document.getElementById('videoUrl').value;
+            const video = document.getElementById('video');
+            
+            try {
+                // Mostrar feedback al usuario
+                this.textContent = 'Cargando...';
+                this.disabled = true;
+                
+                // Hacer la solicitud con headers adecuados
+                const response = await fetch('http://35.239.208.148:5000/get_m3u8', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ url: videoUrl })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
                 if (Hls.isSupported()) {
                     const hls = new Hls();
                     hls.loadSource(data.m3u8);
                     hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
                         video.play();
                     });
-                } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = data.m3u8;
-                    video.addEventListener("loadedmetadata", () => {
+                    video.addEventListener('loadedmetadata', function() {
                         video.play();
                     });
-                } else {
-                    alert("Tu navegador no soporta HLS");
                 }
-            } else {
-                alert("No se encontró un enlace .m3u8");
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error al cargar el video: ${error.message}`);
+            } finally {
+                this.textContent = 'Cargar Video';
+                this.disabled = false;
             }
-
-        } catch (err) {
-            console.error(err);
-            alert("Error al llamar la API o al procesar la respuesta");
-        }
-    });
-});
-</script>
+        });
+    </script>
 </body>
 </html>
